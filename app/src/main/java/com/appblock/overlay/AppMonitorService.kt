@@ -5,13 +5,19 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.widget.Toast
 
 class AppMonitorService : AccessibilityService() {
 
     companion object {
         private const val TAG = "AppMonitorService"
-        private const val THRESHOLD_MILLIS = 10 * 60 * 1000L // 10 minutos
-        private const val RESET_AWAY_MILLIS = 30 * 60 * 1000L // 30 minutos
+
+        // ⚠️ MODO PRUEBA: 20 segundos en vez de 10 minutos.
+        // Cuando confirmes que funciona, cambiá esto de nuevo a:
+        // private const val THRESHOLD_MILLIS = 10 * 60 * 1000L
+        private const val THRESHOLD_MILLIS = 20 * 1000L
+
+        private const val RESET_AWAY_MILLIS = 30 * 60 * 1000L
         private const val CHECK_INTERVAL_MILLIS = 5_000L
     }
 
@@ -51,11 +57,10 @@ class AppMonitorService : AccessibilityService() {
 
             if (awayTime >= RESET_AWAY_MILLIS) {
                 saveAccumulated(newPackage, 0L)
-                saveNotified(newPackage, false)
-                Log.d(TAG, "$newPackage: pasaron 30+ min afuera, contador reseteado")
+                saveMilestonesShown(newPackage, 0)
             }
 
-            Log.d(TAG, "Entró a $newPackage. Acumulado previo: ${getAccumulated(newPackage) / 1000}s")
+            toast("Monitoreando $newPackage — acumulado: ${getAccumulated(newPackage) / 1000}s")
             startPeriodicCheck(newPackage)
         }
     }
@@ -78,22 +83,52 @@ class AppMonitorService : AccessibilityService() {
 
     private fun checkThreshold(packageName: String) {
         if (packageName != currentPackage) return
+        if (MotivationOverlayHelper.isShowing()) return
+
         val now = System.currentTimeMillis()
         val currentSession = now - sessionStartTime
         val total = getAccumulated(packageName) + currentSession
 
-        if (total >= THRESHOLD_MILLIS && !getNotified(packageName)) {
-            saveNotified(packageName, true)
-            Log.d(TAG, "🔔 $packageName llegó a los 10 minutos acumulados — acá va el aviso")
+        val milestonesReached = (total / THRESHOLD_MILLIS).toInt()
+        val milestonesShown = getMilestonesShown(packageName)
+
+        // Toast cada chequeo, para que veas que el service SÍ está vivo y contando.
+        toast("Total: ${total / 1000}s / umbral: ${THRESHOLD_MILLIS / 1000}s")
+
+        if (milestonesReached > milestonesShown) {
+            saveMilestonesShown(packageName, milestonesReached)
+            toast("🔔 Umbral alcanzado, mostrando overlay...")
+            showMotivationOverlay(packageName)
         }
+    }
+
+    private fun showMotivationOverlay(packageName: String) {
+        try {
+            val phrase = MotivationalPhrasesManager.getRandomPhrase(this)
+            MotivationOverlayHelper.show(
+                service = this,
+                phrase = phrase,
+                onExit = { performGlobalAction(GLOBAL_ACTION_HOME) },
+                onEmergency = {
+                    Log.d(TAG, "Emergencia usada en $packageName, se sigue usando la app")
+                }
+            )
+        } catch (e: Exception) {
+            toast("❌ ERROR al mostrar overlay: ${e.message}")
+            Log.e(TAG, "Error mostrando overlay", e)
+        }
+    }
+
+    private fun toast(msg: String) {
+        Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
     }
 
     private fun getAccumulated(pkg: String): Long = prefs.getLong("accum_$pkg", 0L)
     private fun saveAccumulated(pkg: String, value: Long) { prefs.edit().putLong("accum_$pkg", value).apply() }
     private fun getLastExitTime(pkg: String): Long = prefs.getLong("exit_$pkg", 0L)
     private fun saveLastExitTime(pkg: String, value: Long) { prefs.edit().putLong("exit_$pkg", value).apply() }
-    private fun getNotified(pkg: String): Boolean = prefs.getBoolean("notified_$pkg", false)
-    private fun saveNotified(pkg: String, value: Boolean) { prefs.edit().putBoolean("notified_$pkg", value).apply() }
+    private fun getMilestonesShown(pkg: String): Int = prefs.getInt("milestones_$pkg", 0)
+    private fun saveMilestonesShown(pkg: String, value: Int) { prefs.edit().putInt("milestones_$pkg", value).apply() }
 
     override fun onInterrupt() {
         stopPeriodicCheck()
