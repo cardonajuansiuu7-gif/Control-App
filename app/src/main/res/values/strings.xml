@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AppBlock</string>
+    <string name="accessibility_service_description">Detecta cuánto tiempo pasás en las apps que elegiste moderar y muestra un aviso cuando corresponde.</string>
 </resources>
