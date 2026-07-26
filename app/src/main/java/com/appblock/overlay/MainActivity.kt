@@ -1,5 +1,6 @@
 package com.appblock.overlay
 
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -7,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.TextUtils
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +24,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var apps: MutableList<AppInfo>
+    private lateinit var btnOverlayPermission: Button
+    private lateinit var btnAccessibilityPermission: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,11 +44,14 @@ class MainActivity : AppCompatActivity() {
         }
         recyclerView.adapter = adapter
 
-        findViewById<Button>(R.id.btnOverlayPermission).setOnClickListener {
+        btnOverlayPermission = findViewById(R.id.btnOverlayPermission)
+        btnAccessibilityPermission = findViewById(R.id.btnAccessibilityPermission)
+
+        btnOverlayPermission.setOnClickListener {
             requestOverlayPermission()
         }
 
-        findViewById<Button>(R.id.btnAccessibilityPermission).setOnClickListener {
+        btnAccessibilityPermission.setOnClickListener {
             openAccessibilitySettings()
         }
 
@@ -54,11 +61,55 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshPermissionButtons()
+    }
+
+    private fun refreshPermissionButtons() {
+        val overlayGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+            Settings.canDrawOverlays(this)
+        if (overlayGranted) {
+            btnOverlayPermission.text = "Permiso de overlay concedido ✓"
+            btnOverlayPermission.isEnabled = false
+        } else {
+            btnOverlayPermission.text = "Activar permiso de overlay"
+            btnOverlayPermission.isEnabled = true
+        }
+
+        if (isAccessibilityServiceEnabled()) {
+            btnAccessibilityPermission.text = "Servicio de accesibilidad activado ✓"
+            btnAccessibilityPermission.isEnabled = false
+        } else {
+            btnAccessibilityPermission.text = "Activar servicio de accesibilidad"
+            btnAccessibilityPermission.isEnabled = true
+        }
+    }
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val expectedComponentName = ComponentName(this, AppMonitorService::class.java)
+        val enabledServicesSetting = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+
+        val colonSplitter = TextUtils.SimpleStringSplitter(':')
+        colonSplitter.setString(enabledServicesSetting)
+
+        while (colonSplitter.hasNext()) {
+            val componentNameString = colonSplitter.next()
+            val enabledComponent = ComponentName.unflattenFromString(componentNameString)
+            if (enabledComponent != null && enabledComponent == expectedComponentName) {
+                return true
+            }
+        }
+        return false
+    }
+
     private fun loadInstalledApps(selectedPackages: Set<String>): List<AppInfo> {
         val pm = packageManager
         val intent = Intent(Intent.ACTION_MAIN, null)
         intent.addCategory(Intent.CATEGORY_LAUNCHER)
-
         val resolveInfos = pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
 
         return resolveInfos
@@ -95,10 +146,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun openAccessibilitySettings() {
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        Toast.makeText(
-            this,
-            "Buscá 'AppBlock' en la lista y activalo",
-            Toast.LENGTH_LONG
-        ).show()
+        Toast.makeText(this, "Buscá 'AppBlock' en la lista y activalo", Toast.LENGTH_LONG).show()
     }
 }
