@@ -11,13 +11,8 @@ class AppMonitorService : AccessibilityService() {
 
     companion object {
         private const val TAG = "AppMonitorService"
-
-        // ⚠️ MODO PRUEBA: 20 segundos en vez de 10 minutos.
-        // Cuando confirmes que funciona, cambiá esto de nuevo a:
-        // private const val THRESHOLD_MILLIS = 10 * 60 * 1000L
-        private const val THRESHOLD_MILLIS = 20 * 1000L
-
-        private const val RESET_AWAY_MILLIS = 30 * 60 * 1000L
+        private const val THRESHOLD_MILLIS = 10 * 60 * 1000L // 10 minutos
+        private const val RESET_AWAY_MILLIS = 30 * 60 * 1000L // 30 minutos
         private const val CHECK_INTERVAL_MILLIS = 5_000L
     }
 
@@ -58,9 +53,10 @@ class AppMonitorService : AccessibilityService() {
             if (awayTime >= RESET_AWAY_MILLIS) {
                 saveAccumulated(newPackage, 0L)
                 saveMilestonesShown(newPackage, 0)
+                Log.d(TAG, "$newPackage: pasaron 30+ min afuera, contador reseteado")
             }
 
-            toast("Monitoreando $newPackage — acumulado: ${getAccumulated(newPackage) / 1000}s")
+            Log.d(TAG, "Entró a $newPackage. Acumulado previo: ${getAccumulated(newPackage) / 1000}s")
             startPeriodicCheck(newPackage)
         }
     }
@@ -92,12 +88,9 @@ class AppMonitorService : AccessibilityService() {
         val milestonesReached = (total / THRESHOLD_MILLIS).toInt()
         val milestonesShown = getMilestonesShown(packageName)
 
-        // Toast cada chequeo, para que veas que el service SÍ está vivo y contando.
-        toast("Total: ${total / 1000}s / umbral: ${THRESHOLD_MILLIS / 1000}s")
-
         if (milestonesReached > milestonesShown) {
             saveMilestonesShown(packageName, milestonesReached)
-            toast("🔔 Umbral alcanzado, mostrando overlay...")
+            Log.d(TAG, "🔔 $packageName llegó a los ${milestonesReached * 10} minutos acumulados")
             showMotivationOverlay(packageName)
         }
     }
@@ -114,13 +107,9 @@ class AppMonitorService : AccessibilityService() {
                 }
             )
         } catch (e: Exception) {
-            toast("❌ ERROR al mostrar overlay: ${e.message}")
+            Toast.makeText(applicationContext, "❌ Error al mostrar overlay: ${e.message}", Toast.LENGTH_LONG).show()
             Log.e(TAG, "Error mostrando overlay", e)
         }
-    }
-
-    private fun toast(msg: String) {
-        Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
     }
 
     private fun getAccumulated(pkg: String): Long = prefs.getLong("accum_$pkg", 0L)
