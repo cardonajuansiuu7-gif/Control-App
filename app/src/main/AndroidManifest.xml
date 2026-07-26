@@ -2,15 +2,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Permiso para dibujar el overlay sobre otras apps -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- Necesario en Android 11+ para poder listar TODAS las apps instaladas -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+
+    <!-- Se pedirá manualmente desde Ajustes (no se puede otorgar por diálogo) -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/sym_def_app_icon"
+        android:icon="@drawable/icon"
+        android:roundIcon="@drawable/icon"
         android:label="AppBlock"
         android:theme="@style/Theme.AppBlock"
         android:usesCleartextTraffic="false">
@@ -37,4 +43,5 @@
         </service>
 
     </application>
+
 </manifest>
