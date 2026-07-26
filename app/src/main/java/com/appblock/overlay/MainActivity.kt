@@ -9,8 +9,13 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.text.TextUtils
+import android.view.LayoutInflater
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.EditText
+import android.widget.ListView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -58,6 +63,10 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnSave).setOnClickListener {
             saveSelection(prefs)
             Toast.makeText(this, "Selección guardada", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<Button>(R.id.btnManagePhrases).setOnClickListener {
+            showManagePhrasesDialog()
         }
     }
 
@@ -147,5 +156,41 @@ class MainActivity : AppCompatActivity() {
     private fun openAccessibilitySettings() {
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         Toast.makeText(this, "Buscá 'AppBlock' en la lista y activalo", Toast.LENGTH_LONG).show()
+    }
+
+    private fun showManagePhrasesDialog() {
+        val phrases = MotivationalPhrasesManager.getCustomPhrases(this).toMutableList()
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_manage_phrases, null)
+        val listView = dialogView.findViewById<ListView>(R.id.lvPhrases)
+        val editText = dialogView.findViewById<EditText>(R.id.etNewPhrase)
+        val btnAdd = dialogView.findViewById<Button>(R.id.btnAddPhrase)
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, phrases)
+        listView.adapter = adapter
+
+        btnAdd.setOnClickListener {
+            val text = editText.text.toString().trim()
+            if (text.isNotEmpty()) {
+                MotivationalPhrasesManager.addPhrase(this, text)
+                phrases.add(text)
+                adapter.notifyDataSetChanged()
+                editText.text.clear()
+            }
+        }
+
+        listView.setOnItemLongClickListener { _, _, position, _ ->
+            val phrase = phrases[position]
+            MotivationalPhrasesManager.removePhrase(this, phrase)
+            phrases.removeAt(position)
+            adapter.notifyDataSetChanged()
+            true
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Mis frases motivadoras")
+            .setView(dialogView)
+            .setPositiveButton("Cerrar", null)
+            .show()
     }
 }
